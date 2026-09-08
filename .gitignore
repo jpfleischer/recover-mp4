@@ -1,1 +1,31 @@
 __pycache__
+
+# Source recordings and recovered media
+*.mp4
+*.mp4.part
+*.mov
+*.m4v
+*.mkv
+*.avi
+*.webm
+*.wav
+*.aac
+*.m4a
+*.mp3
+*_recovered.mp4
+*.fixed.mp4
+*.audio.tmp.mp4
+
+# Recovery/debug artifacts
+out_*.bin
+out_*.json
+*.audio.tmp*
+
+# Python tooling
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# C/C++ build output
+cpp/build/
+cmake-build-*/
