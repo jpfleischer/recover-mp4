@@ -12,9 +12,14 @@ Performance: O(file_size) single-pass with buffered I/O.
 import struct
 from bisect import bisect_left, bisect_right
 
-from .constants import (
-    AUD_PATTERN, VALID_NAL_MASK, MAX_NAL_SIZE, parse_slice_type,
-)
+try:
+    from .constants import (
+        AUD_PATTERN, VALID_NAL_MASK, MAX_NAL_SIZE, parse_slice_type,
+    )
+except ImportError:  # Also allow the recovery helpers to run as scripts.
+    from constants import (
+        AUD_PATTERN, VALID_NAL_MASK, MAX_NAL_SIZE, parse_slice_type,
+    )
 
 _BUF_SIZE = 4 * 1024 * 1024  # 4 MB read buffer
 _UNPACK_I = struct.Struct('>I').unpack_from  # pre-compiled for hot loop

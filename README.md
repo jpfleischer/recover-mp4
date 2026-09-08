@@ -2,11 +2,16 @@
 
 Recovers corrupted MP4 files missing the **moov atom** by scanning raw mdat data for H.264 video and AAC audio samples, then rebuilding the MP4 index from scratch.
 
-Built for **Windows Snipping Tool** recordings (H.264 + AAC-LC, interleaved `[V][A][V][A]...`).
+Built for **Windows Snipping Tool** recordings (H.264 + AAC-LC, interleaved
+`[V][A][V][A]...`), with a separate Python path for length-prefixed x264
+recordings that omit AUD markers.
 
-No reference file needed — codec config is auto-detected from an encoder SEI embedded in the corrupted file's mdat.
+No reference file needed for the standard path — codec config is auto-detected
+from an encoder SEI embedded in the corrupted file's mdat. The no-AUD x264 path
+uses explicit recording settings when they are not the defaults.
 
-Available in **Python** and **C++**. Both produce identical output.
+The standard path is available in **Python** and **C++**. Both produce
+identical output.
 
 ## Requirements
 
@@ -38,6 +43,48 @@ cd cpp && mkdir build && cd build && cmake .. && make -j$(nproc)
 ```
 
 Reference is optional. If omitted, codec config is auto-detected from the corrupted file. If `output.mp4` is omitted, writes to `<corrupted>_recovered.mp4`.
+
+### Tests
+
+```
+python -m unittest discover -v
+```
+
+### x264 recordings without AUD markers
+
+Some screen-recording apps write length-prefixed x264 slices interleaved with
+raw AAC but omit H.264 AUD NALs. For that layout, when the missing `moov` cannot
+be repaired with the standard command and no reference clip is available, use:
+
+```
+python x264_recovery.py <corrupted.mp4> [output.mp4]
+```
+
+For the investigated x264 family, `--auto` can read encoder options, probe
+common resolutions by decoding a few frames, detect channel layout, and infer
+standard FPS/audio-rate pairs from the interleave:
+
+```
+python x264_recovery.py damaged.mp4 fixed.mp4 --auto
+```
+
+The defaults match the recovered 1920x1080, 60 fps, 48 kHz layout. For a
+recording with different original settings, provide them explicitly, for
+example:
+
+```
+python x264_recovery.py damaged.mp4 fixed.mp4 --width 2560 --height 1440 --fps 30 --audio-rate 48000
+```
+
+Use `--scan-only` to inspect the detected settings and video/audio boundaries
+without writing an output file. `--auto` is deliberately conservative: raw
+AAC does not contain its sample rate, and the missing MP4 index contains no
+timestamps, so uncertain values are reported as assumptions and can be
+overridden with the explicit options. The command regenerates the AAC track as one
+continuous stream, which avoids the timestamp drift seen when repairing each
+short segment independently. This format still cannot have its missing codec
+settings fully recovered from the media bytes, so verify or override any
+assumptions when they differ from the defaults.
 
 ## How It Works
 
@@ -91,6 +138,7 @@ Fixed parameters across all recordings:
 ```
 recover_mp4/
 ├── __main__.py      # CLI entry point
+├── x264_recovery.py  # reference-free scanner for no-AUD x264 recordings
 ├── constants.py     # NAL patterns, slice type parser
 ├── reference.py     # Reference parser + SEI auto-detection
 ├── scanner.py       # mdat scanner (video/audio detection + bootstrap)

@@ -119,9 +119,29 @@ def build_stsd_video(sps, pps, width, height):
     return build_full_box(b'stsd', 0, 0, struct.pack('>I', 1) + avc1)
 
 
-def build_stsd_audio(timescale):
-    """Build audio stsd with mp4a + esds (AAC-LC stereo)."""
-    aac_config = b'\x11\x90'  # AAC-LC, 48 kHz, stereo
+def build_stsd_audio(timescale, channels=2, audio_object_type=2):
+    """Build audio stsd with mp4a + esds.
+
+    The original implementation only needed AAC-LC at 48 kHz stereo.  Keep
+    those defaults, but generate AudioSpecificConfig for other supported
+    sample rates/channels so reference-free recovery can be configured for
+    similar recordings.
+    """
+    sample_rates = {
+        96000: 0, 88200: 1, 64000: 2, 48000: 3, 44100: 4,
+        32000: 5, 24000: 6, 22050: 7, 16000: 8, 12000: 9,
+        11025: 10, 8000: 11, 7350: 12,
+    }
+    if timescale not in sample_rates:
+        raise ValueError(f'Unsupported AAC sample rate: {timescale}')
+    if not 1 <= channels <= 7:
+        raise ValueError(f'Unsupported AAC channel count: {channels}')
+    # audioObjectType(5), samplingFrequencyIndex(4), channelConfig(4),
+    # followed by GASpecificConfig frameLengthFlag(1), dependsOnCoreCoder(1),
+    # extensionFlag(1), and padding.
+    config_bits = ((audio_object_type & 0x1F) << 11) | \
+                  (sample_rates[timescale] << 7) | (channels << 3)
+    aac_config = struct.pack('>H', config_bits)
 
     def desc_tag(tag, content):
         return bytes([tag, 0x80, 0x80, 0x80, len(content)]) + content
@@ -143,7 +163,7 @@ def build_stsd_audio(timescale):
         b'\x00' * 6,
         struct.pack('>H', 1),
         b'\x00' * 8,
-        struct.pack('>HH', 2, 16),
+        struct.pack('>HH', channels, 16),
         b'\x00' * 4,
         struct.pack('>I', timescale << 16),
         esds,
@@ -338,7 +358,9 @@ def build_moov(ref_info, scan_info):
     # Audio trak
     audio_trak = b''
     if as_:
-        a_stsd = build_stsd_audio(a_ts)
+        a_stsd = build_stsd_audio(a_ts,
+                                   ref_info['audio'].get('channels', 2),
+                                   ref_info['audio'].get('audio_object_type', 2))
         a_stts = build_stts(len(as_), a_delta)
         a_stsc = build_stsc(ac)
         a_stsz = build_stsz(as_)

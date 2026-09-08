@@ -247,7 +247,7 @@ def _fix_audio_reencode(output_path, ffmpeg):
              '-i', output_path, '-i', concat_audio,
              '-map', '0:v', '-map', '1:a',
              '-c:v', 'copy', '-c:a', 'copy',
-             '-movflags', '+faststart', tmp],
+             '-shortest', '-movflags', '+faststart', tmp],
             capture_output=True, text=True, timeout=3600)
         if r.returncode == 0 and os.path.exists(tmp):
             os.replace(tmp, output_path)
